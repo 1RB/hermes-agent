@@ -826,6 +826,31 @@ class TelegramAdapter(BasePlatformAdapter):
             return InlineKeyboardMarkup(rows)
         return None
 
+    def _make_action_keyboard(
+        self,
+        session_key: str = "",
+        extra_buttons: Optional[List[Dict[str, str]]] = None,
+    ) -> "InlineKeyboardMarkup":
+        """Build an InlineKeyboardMarkup with standard action buttons."""
+        buttons: List[List["InlineKeyboardButton"]] = [
+            [
+                InlineKeyboardButton("\U0001f504 Regenerate",
+                    callback_data="hermes:regenerate:" + (session_key or "local")),
+                InlineKeyboardButton("\U0001f4cb Copy",
+                    callback_data="hermes:copy"),
+            ]
+        ]
+        if extra_buttons:
+            row: List["InlineKeyboardButton"] = []
+            for btn in extra_buttons:
+                row.append(InlineKeyboardButton(
+                    btn.get("text", ""),
+                    callback_data=btn.get("callback_data", ""),
+                    url=btn.get("url"),
+                ))
+            buttons.append(row)
+        return InlineKeyboardMarkup(buttons)
+
     async def send(
         self,
         chat_id: str,
@@ -1140,74 +1165,6 @@ class TelegramAdapter(BasePlatformAdapter):
         except Exception as e:
             logger.warning("[%s] send_update_prompt failed: %s", self.name, e)
             return SendResult(success=False, error=str(e))
-
-    def _make_action_keyboard(
-        self,
-        session_key: str = "",
-        extra_buttons: Optional[List[Dict[str, str]]] = None,
-    ) -> "InlineKeyboardMarkup":
-        """Build an InlineKeyboardMarkup with standard action buttons.
-
-        Buttons:
-        - Regenerate: re-runs the last user message
-        - Copy: strips markdown for easy copying
-        """
-        buttons: List[List["InlineKeyboardButton"]] = [
-            [
-                InlineKeyboardButton("\U0001f504 Regenerate", callback_data="hermes:regenerate:" + (session_key or "local")),
-                InlineKeyboardButton("\U0001f4cb Copy", callback_data="hermes:copy"),
-            ]
-        ]
-        if extra_buttons:
-            row: List["InlineKeyboardButton"] = []
-            for btn in extra_buttons:
-                row.append(
-                    InlineKeyboardButton(
-                        btn.get("text", ""),
-                        callback_data=btn.get("callback_data", ""),
-                        url=btn.get("url"),
-                    )
-                )
-            buttons.append(row)
-        return InlineKeyboardMarkup(buttons)
-
-    def _parse_buttons(
-        self, raw: Any
-    ) -> Optional["InlineKeyboardMarkup"]:
-        """Convert a button specification into an InlineKeyboardMarkup.
-
-        Accepts:
-        - An already-built InlineKeyboardMarkup (passed through)
-        - A list of lists of dicts: [[{"text":"X","callback_data":"y"}], ...]
-        - A single list of dicts (converted to a single row)
-        """
-        if isinstance(raw, InlineKeyboardMarkup):
-            return raw
-        if not isinstance(raw, list) or not raw:
-            return None
-
-        first = raw[0]
-        if isinstance(first, list):
-            rows = raw
-        else:
-            rows = [raw]
-
-        keyboard: List[List["InlineKeyboardButton"]] = []
-        for row in rows:
-            kb_row: List["InlineKeyboardButton"] = []
-            for btn in row:
-                if isinstance(btn, dict):
-                    kb_row.append(
-                        InlineKeyboardButton(
-                            btn.get("text", ""),
-                            callback_data=btn.get("callback_data", ""),
-                            url=btn.get("url"),
-                        )
-                    )
-            if kb_row:
-                keyboard.append(kb_row)
-
-        return InlineKeyboardMarkup(keyboard) if keyboard else None
 
     async def _handle_callback_query(
         self, update: "Update", context: "ContextTypes.DEFAULT_TYPE"
